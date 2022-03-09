@@ -1,0 +1,557 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "GUAC_NAME": {
+            "type": "string",
+            "maxLength": 12,
+            "metadata":{
+                "description": "Name of Guacamole Rendering Machine."
+            }
+        },
+        "EMAIL_TAG": {
+            "type": "String"
+        },
+        "ADDRESS_SPACE_PREFIXES": {
+            "defaultValue": "10.0.0.0/16",
+            "type": "string"
+        },
+        "SUBNET_ADDRESS_PREFIXES": {
+            "defaultValue": "10.0.0.0/24",
+            "type": "string"
+        },
+        "ADMIN_USERNAME": {
+            "type": "string"
+        },
+        "ADMIN_SSH_KEY": {
+            "type": "securestring"
+        },
+        "GUAC_VM_SIZE": {
+            "type": "string",
+            "allowedValues": [
+                "Standard_B2ms"
+            ]
+        }
+    },
+    "variables": {
+        "GUAC_LOCATION": "[resourceGroup().location]",
+        "GUAC_VIRTUAL_MACHINE_NAME": "[concat(parameters('GUAC_NAME'), '-vm')]",
+        "GUAC_STORAGE_ACCOUNT_NAME": "[concat(parameters('GUAC_NAME'), 'vhds')]",
+        "GUAC_NETWORK_INTERFACE_NAME":"[concat(parameters('GUAC_NAME'), '-nic')]",
+        "GUAC_PUBLIC_IP_ADDRESS_NAME": "[concat(parameters('GUAC_NAME'), '-ip')]",
+        "GUAC_VIRTUAL_NETWORK_NAME": "[concat(parameters('GUAC_NAME'), '-vnet')]",
+        "GUAC_NETWORK_SECURITY_GROUP_NAME": "[concat(parameters('GUAC_NAME'), '-nsg')]",
+        "OS_PUBLISHER": "Canonical",
+        "OS_OFFER": "UbuntuServer",
+        "OS_SKU": "18.04-LTS",
+        "OS_VERSION": "latest",
+        "OS_TYPE": "Linux"
+    },
+
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-11-01",
+            "name": "[variables('GUAC_NETWORK_SECURITY_GROUP_NAME')]",
+            "location": "[variables('GUAC_LOCATION')]",
+            "tags": {
+                "_contact_person": "[parameters('EMAIL_TAG')]"
+            },
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "SSH",
+                        "properties": {
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "22",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 300,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name": "HTTPS",
+                        "properties": {
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 320,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name": "HTTP",
+                        "properties": {
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "80",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 340,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name": "RDP",
+                        "properties": {
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3389",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 360,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name": "MySQL",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3306",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 370,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name": "Port_8080",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "8080",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 380,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-11-01",
+            "name": "[variables('GUAC_PUBLIC_IP_ADDRESS_NAME')]",
+            "location": "[variables('GUAC_LOCATION')]",
+            "tags": {
+                "_contact_person": "[parameters('EMAIL_TAG')]"
+            },
+            "sku": {
+                "name": "Basic",
+                "tier": "Regional"
+            },
+            "properties": {
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Dynamic",
+                "idleTimeoutInMinutes": 4,
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('GUAC_NAME')]",
+                    "fqdn": "[concat(parameters('GUAC_NAME') ,'.southeastasia.cloudapp.azure.com')]"
+                },
+                "ipTags": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-11-01",
+            "name": "[variables('GUAC_VIRTUAL_NETWORK_NAME')]",
+            "location": "[variables('GUAC_LOCATION')]",
+            "tags": {
+                "_contact_person": "[parameters('EMAIL_TAG')]"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('ADDRESS_SPACE_PREFIXES')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "default",
+                        "properties": {
+                            "addressPrefix": "[parameters('SUBNET_ADDRESS_PREFIXES')]",
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    }
+                ],
+                "virtualNetworkPeerings": [],
+                "enableDdosProtection": false
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('GUAC_STORAGE_ACCOUNT_NAME')]",
+            "location": "[variables('GUAC_LOCATION')]",
+            "tags": {
+                "_contact_person": "[parameters('EMAIL_TAG')]"
+            },
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "Storage",
+            "properties": {
+                "minimumTlsVersion": "TLS1_2",
+                "allowBlobPublicAccess": true,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": true,
+                "encryption": {
+                    "services": {
+                        "file": {
+                            "keyType": "Account",
+                            "enabled": true
+                        },
+                        "blob": {
+                            "keyType": "Account",
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(variables('GUAC_NETWORK_SECURITY_GROUP_NAME'), '/HTTP')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('GUAC_NETWORK_SECURITY_GROUP_NAME'))]"
+            ],
+            "properties": {
+                "protocol": "TCP",
+                "sourcePortRange": "*",
+                "destinationPortRange": "80",
+                "sourceAddressPrefix": "*",
+                "destinationAddressPrefix": "*",
+                "access": "Allow",
+                "priority": 340,
+                "direction": "Inbound",
+                "sourcePortRanges": [],
+                "destinationPortRanges": [],
+                "sourceAddressPrefixes": [],
+                "destinationAddressPrefixes": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(variables('GUAC_NETWORK_SECURITY_GROUP_NAME'), '/HTTPS')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('GUAC_NETWORK_SECURITY_GROUP_NAME'))]"
+            ],
+            "properties": {
+                "protocol": "TCP",
+                "sourcePortRange": "*",
+                "destinationPortRange": "443",
+                "sourceAddressPrefix": "*",
+                "destinationAddressPrefix": "*",
+                "access": "Allow",
+                "priority": 320,
+                "direction": "Inbound",
+                "sourcePortRanges": [],
+                "destinationPortRanges": [],
+                "sourceAddressPrefixes": [],
+                "destinationAddressPrefixes": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(variables('GUAC_NETWORK_SECURITY_GROUP_NAME'), '/MySQL')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('GUAC_NETWORK_SECURITY_GROUP_NAME'))]"
+            ],
+            "properties": {
+                "protocol": "*",
+                "sourcePortRange": "*",
+                "destinationPortRange": "3306",
+                "sourceAddressPrefix": "*",
+                "destinationAddressPrefix": "*",
+                "access": "Allow",
+                "priority": 370,
+                "direction": "Inbound",
+                "sourcePortRanges": [],
+                "destinationPortRanges": [],
+                "sourceAddressPrefixes": [],
+                "destinationAddressPrefixes": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(variables('GUAC_NETWORK_SECURITY_GROUP_NAME'), '/Port_8080')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('GUAC_NETWORK_SECURITY_GROUP_NAME'))]"
+            ],
+            "properties": {
+                "protocol": "*",
+                "sourcePortRange": "*",
+                "destinationPortRange": "8080",
+                "sourceAddressPrefix": "*",
+                "destinationAddressPrefix": "*",
+                "access": "Allow",
+                "priority": 380,
+                "direction": "Inbound",
+                "sourcePortRanges": [],
+                "destinationPortRanges": [],
+                "sourceAddressPrefixes": [],
+                "destinationAddressPrefixes": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(variables('GUAC_NETWORK_SECURITY_GROUP_NAME'), '/RDP')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('GUAC_NETWORK_SECURITY_GROUP_NAME'))]"
+            ],
+            "properties": {
+                "protocol": "TCP",
+                "sourcePortRange": "*",
+                "destinationPortRange": "3389",
+                "sourceAddressPrefix": "*",
+                "destinationAddressPrefix": "*",
+                "access": "Allow",
+                "priority": 360,
+                "direction": "Inbound",
+                "sourcePortRanges": [],
+                "destinationPortRanges": [],
+                "sourceAddressPrefixes": [],
+                "destinationAddressPrefixes": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(variables('GUAC_NETWORK_SECURITY_GROUP_NAME'), '/SSH')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('GUAC_NETWORK_SECURITY_GROUP_NAME'))]"
+            ],
+            "properties": {
+                "protocol": "TCP",
+                "sourcePortRange": "*",
+                "destinationPortRange": "22",
+                "sourceAddressPrefix": "*",
+                "destinationAddressPrefix": "*",
+                "access": "Allow",
+                "priority": 300,
+                "direction": "Inbound",
+                "sourcePortRanges": [],
+                "destinationPortRanges": [],
+                "sourceAddressPrefixes": [],
+                "destinationAddressPrefixes": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(variables('GUAC_VIRTUAL_NETWORK_NAME'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('GUAC_VIRTUAL_NETWORK_NAME'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[parameters('SUBNET_ADDRESS_PREFIXES')]",
+                "delegations": [],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(variables('GUAC_STORAGE_ACCOUNT_NAME'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('GUAC_STORAGE_ACCOUNT_NAME'))]"
+            ],
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                },
+                "deleteRetentionPolicy": {
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2021-11-01",
+            "name": "[variables('GUAC_VIRTUAL_MACHINE_NAME')]",
+            "location": "[variables('GUAC_LOCATION')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/StorageAccounts', variables('GUAC_STORAGE_ACCOUNT_NAME'))]",
+                "[resourceId('Microsoft.Network/networkInterfaces', variables('GUAC_NETWORK_INTERFACE_NAME'))]"
+            ],
+            "tags": {
+                "_contact_person": "[parameters('EMAIL_TAG')]"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('GUAC_VM_SIZE')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('OS_PUBLISHER')]",
+                        "offer": "[variables('OS_OFFER')]",
+                        "sku": "[variables('OS_SKU')]",
+                        "version": "[variables('OS_VERSION')]"
+                    },
+                    "osDisk": {
+                        "osType": "[variables('OS_TYPE')]",
+                        "name": "[variables('GUAC_VIRTUAL_MACHINE_NAME')]",
+                        "createOption": "FromImage",
+                        "vhd": {
+                            "uri": "[concat('https://', variables('GUAC_STORAGE_ACCOUNT_NAME'), concat('.blob.core.windows.net/vhds/', variables('GUAC_VIRTUAL_MACHINE_NAME'), 'dataDisk.vhd'))]"
+                        },
+                        "caching": "ReadWrite",
+                        "deleteOption": "Detach",
+                        "diskSizeGB": 30
+                    },
+                    "dataDisks": []
+                },
+                "osProfile": {
+                    "computerName": "[variables('GUAC_VIRTUAL_MACHINE_NAME')]",
+                    "adminUsername": "[parameters('ADMIN_USERNAME')]",
+                    "linuxConfiguration": {
+                        "disablePasswordAuthentication": true,
+                        "ssh": {
+                            "publicKeys": [
+                                {
+                                    "path": "[format('/home/{0}/.ssh/authorized_keys', parameters('ADMIN_USERNAME'))]",
+                                    "keyData": "[parameters('ADMIN_SSH_KEY')]"
+                                }
+                            ]
+                        }
+                    },
+                    "secrets": []
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('GUAC_NETWORK_INTERFACE_NAME'))]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(variables('GUAC_STORAGE_ACCOUNT_NAME'), '/default/vhds')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('GUAC_STORAGE_ACCOUNT_NAME'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('GUAC_STORAGE_ACCOUNT_NAME'))]"
+            ],
+            "properties": {
+                "immutableStorageWithVersioning": {
+                    "enabled": false
+                },
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": false,
+                "publicAccess": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2020-11-01",
+            "name": "[variables('GUAC_NETWORK_INTERFACE_NAME')]",
+            "location": "[variables('GUAC_LOCATION')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('GUAC_PUBLIC_IP_ADDRESS_NAME'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('GUAC_VIRTUAL_NETWORK_NAME'), 'default')]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('GUAC_NETWORK_SECURITY_GROUP_NAME'))]"
+            ],
+            "tags": {
+                "_contact_person": "[parameters('EMAIL_TAG')]"
+            },
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('GUAC_PUBLIC_IP_ADDRESS_NAME'))]"
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('GUAC_VIRTUAL_NETWORK_NAME'), 'default')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "dnsSettings": {
+                    "dnsServers": []
+                },
+                "enableAcceleratedNetworking": false,
+                "enableIPForwarding": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('GUAC_NETWORK_SECURITY_GROUP_NAME'))]"
+                }
+            }
+        }
+    ],
+
+    "outputs": {
+        "adminUsername": {
+            "type": "string",
+            "value": "[parameters('ADMIN_USERNAME')]"
+        },
+            "hostname": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('GUAC_PUBLIC_IP_ADDRESS_NAME'))).dnsSettings.fqdn]"
+        },
+            "sshCommand": {
+            "type": "string",
+            "value": "[format('ssh {0}@{1}', parameters('ADMIN_USERNAME'), reference(resourceId('Microsoft.Network/publicIPAddresses', variables('GUAC_PUBLIC_IP_ADDRESS_NAME'))).dnsSettings.fqdn)]"
+        }
+    }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "GUAC_NAME": {
+      "value": "null"
+    },
+    "GUAC_LOCATION": {
+      "value": "southeastasia"
+    },
+    "EMAIL_TAG": {
+      "value": "null"
+    },
+    "ADDRESS_SPACE_PREFIXES": {
+      "value": "10.0.0.0/16"
+    },
+    "SUBNET_ADDRESS_PREFIXES": {
+      "value": "10.0.0.0/24"
+    },
+    "ADMIN_USERNAME": {
+      "value": "null"
+    },
+    "ADMIN_SSH_KEY": {
+      "value": "null"
+    },
+    "GUAC_VM_SIZE": {
+      "value": "Standard_B2ms"
+    }
+  }
+}
