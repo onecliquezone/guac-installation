@@ -9,6 +9,10 @@
                 "description": "Name of Guacamole Rendering Machine."
             }
         },
+        "GUAC_LOCATION": {
+            "defaultValue": "[resourceGroup().location]",
+            "type": "string"
+        },
         "EMAIL_TAG": {
             "type": "String"
         },
@@ -34,7 +38,6 @@
         }
     },
     "variables": {
-        "GUAC_LOCATION": "[resourceGroup().location]",
         "GUAC_VIRTUAL_MACHINE_NAME": "[concat(parameters('GUAC_NAME'), '-vm')]",
         "GUAC_STORAGE_ACCOUNT_NAME": "[concat(parameters('GUAC_NAME'), 'vhds')]",
         "GUAC_NETWORK_INTERFACE_NAME":"[concat(parameters('GUAC_NAME'), '-nic')]",
@@ -53,7 +56,7 @@
             "type": "Microsoft.Network/networkSecurityGroups",
             "apiVersion": "2020-11-01",
             "name": "[variables('GUAC_NETWORK_SECURITY_GROUP_NAME')]",
-            "location": "[variables('GUAC_LOCATION')]",
+            "location": "[parameters('GUAC_LOCATION')]",
             "tags": {
                 "_contact_person": "[parameters('EMAIL_TAG')]"
             },
@@ -168,7 +171,7 @@
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-11-01",
             "name": "[variables('GUAC_PUBLIC_IP_ADDRESS_NAME')]",
-            "location": "[variables('GUAC_LOCATION')]",
+            "location": "[parameters('GUAC_LOCATION')]",
             "tags": {
                 "_contact_person": "[parameters('EMAIL_TAG')]"
             },
@@ -191,7 +194,7 @@
             "type": "Microsoft.Network/virtualNetworks",
             "apiVersion": "2020-11-01",
             "name": "[variables('GUAC_VIRTUAL_NETWORK_NAME')]",
-            "location": "[variables('GUAC_LOCATION')]",
+            "location": "[parameters('GUAC_LOCATION')]",
             "tags": {
                 "_contact_person": "[parameters('EMAIL_TAG')]"
             },
@@ -220,7 +223,7 @@
             "type": "Microsoft.Storage/storageAccounts",
             "apiVersion": "2021-08-01",
             "name": "[variables('GUAC_STORAGE_ACCOUNT_NAME')]",
-            "location": "[variables('GUAC_LOCATION')]",
+            "location": "[parameters('GUAC_LOCATION')]",
             "tags": {
                 "_contact_person": "[parameters('EMAIL_TAG')]"
             },
@@ -424,7 +427,7 @@
             "type": "Microsoft.Compute/virtualMachines",
             "apiVersion": "2021-11-01",
             "name": "[variables('GUAC_VIRTUAL_MACHINE_NAME')]",
-            "location": "[variables('GUAC_LOCATION')]",
+            "location": "[parameters('GUAC_LOCATION')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Storage/StorageAccounts', variables('GUAC_STORAGE_ACCOUNT_NAME'))]",
                 "[resourceId('Microsoft.Network/networkInterfaces', variables('GUAC_NETWORK_INTERFACE_NAME'))]"
@@ -502,7 +505,7 @@
             "type": "Microsoft.Network/networkInterfaces",
             "apiVersion": "2020-11-01",
             "name": "[variables('GUAC_NETWORK_INTERFACE_NAME')]",
-            "location": "[variables('GUAC_LOCATION')]",
+            "location": "[parameters('GUAC_LOCATION')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Network/publicIPAddresses', variables('GUAC_PUBLIC_IP_ADDRESS_NAME'))]",
                 "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('GUAC_VIRTUAL_NETWORK_NAME'), 'default')]",
