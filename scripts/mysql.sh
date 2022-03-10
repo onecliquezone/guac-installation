@@ -15,13 +15,13 @@ help()
 
 parse_args()
 {
-    while [[ "$#" -gt 0 ]]
+    while [ "$#" -gt 0 ]
     do
 
         arg_value="${2}"
         shift_once=0
 
-        if [[ "${arg_value}" =~ "--" ]]; 
+        if [[ "${arg_value}" =~ "--" ]];
         then
             arg_value=""
             shift_once=1
@@ -53,7 +53,7 @@ parse_args()
 
         shift # past argument or value
 
-        if [ $shift_once -eq 0 ]; 
+        if [ $shift_once -eq 0 ];
         then
             shift # past argument or value
         fi
@@ -63,25 +63,26 @@ parse_args()
 # parse script arguments
 parse_args $@
 
-# If /root/.my.cnf exists then it won't ask for root password
-if [ -f /root/.my.cnf ]; then
+
+# If /etc/mysql/my.cnf exists then it won't ask for root password
+if [ -f /etc/mysql/my.cnf ]; then
     
     sudo mysql -e "CREATE DATABASE ${DATABASE};"
-    sudo mysql -e "CREATE USER ${DATABASE}@'%' IDENTIFIED BY '${PASSWORD}';"
-    sudo mysql -e "GRANT ALL PRIVILEGES ON ${DATABASE}.* TO '${DATABASE}''@'%';"
-    sudo mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE ON ${DATABASE}.* TO '${DATABASE}''@'%';"
+    sudo mysql -e "CREATE USER '${USERNAME}'@'%' IDENTIFIED BY '${PASSWORD}';"
+    sudo mysql -e "GRANT ALL PRIVILEGES ON ${DATABASE}.* TO '${USERNAME}'@'%';"
+    sudo mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE ON ${DATABASE}.* TO '${USERNAME}'@'%';"
     sudo mysql -e "FLUSH PRIVILEGES;"
 
-# If /root/.my.cnf doesn't exist then it'll ask for root password   
+# If /etc/mysql/my.cnf doesn't exist then it'll ask for root password   
 else
     echo "Please enter root user MySQL password!"
     echo "Note: password will be hidden when typing"
     read -sp rootpasswd
 
     sudo mysql -u root -p${rootpasswd} -e "CREATE DATABASE ${DATABASE};"
-    sudo mysql -u root -p${rootpasswd} -e "CREATE USER ${DATABASE}@'%' IDENTIFIED BY '${PASSWORD}';"
-    sudo mysql -u root -p${rootpasswd} -e "GRANT ALL PRIVILEGES ON ${DATABASE}.* TO '${DATABASE}''@'%';"
-    sudo mysql -u root -p${rootpasswd} -e "GRANT SELECT, INSERT, UPDATE, DELETE ON ${DATABASE}.* TO '${DATABASE}''@'%';"
+    sudo mysql -u root -p${rootpasswd} -e "CREATE USER '${USERNAME}'@'%' IDENTIFIED BY '${PASSWORD}';"
+    sudo mysql -u root -p${rootpasswd} -e "GRANT ALL PRIVILEGES ON ${DATABASE}.* TO '${USERNAME}'@'%';"
+    sudo mysql -u root -p${rootpasswd} -e "GRANT SELECT, INSERT, UPDATE, DELETE ON ${DATABASE}.* TO '${USERNAME}'@'%';"
     sudo mysql -u root -p${rootpasswd} -e "FLUSH PRIVILEGES;"
 
 fi
