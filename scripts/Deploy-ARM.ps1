@@ -1,24 +1,24 @@
 param(
-    [Parameter(Mandatory=$true)][string]$AzureSubscriptionName,
-    [Parameter(Mandatory=$true)][string]$ResourceGroupName,
+    [Parameter(Mandatory=$true)][string]$AzureSubscriptionName="",
+    [Parameter(Mandatory=$true)][string]$ResourceGroupName="",
     [Parameter(Mandatory=$true)][string]$GUAC_LOCATION="",
     
-    [Parameter(Mandatory=$true)][string]$AadWebClientId,
+    [Parameter(Mandatory=$true)][string]$AadWebClientId="",
     [Parameter(Mandatory=$true)][string]$AadWebClientAppKey="",
-    [Parameter(Mandatory=$true)][string]$AadTenantId,
+    [Parameter(Mandatory=$true)][string]$AadTenantId="",
 
     [Parameter(Mandatory=$true)][string]$FullDeploymentArmTemplateFile="",
 
     [Parameter(Mandatory=$true)][string]$GUAC_NAME="",
     [Parameter(Mandatory=$true)][string]$EMAIL_TAG="",
 
-    [Parameter(Mandatory=$true)][string]$ADDRESS_SPACE_PREFIXES="",
-    [Parameter(Mandatory=$true)][string]$SUBNET_ADDRESS_PREFIXES="",
+    [Parameter(Mandatory=$false)][string]$ADDRESS_SPACE_PREFIXES="10.0.0.0/16",
+    [Parameter(Mandatory=$false)][string]$SUBNET_ADDRESS_PREFIXES="10.0.0.0/24",
 
     [Parameter(Mandatory=$true)][string]$ADMIN_USERNAME="",
     [Parameter(Mandatory=$true)][string]$ADMIN_SSH_KEY="",
 
-    [Parameter(Mandatory=$true)][string]$GUAC_VM_SIZE="",
+    [Parameter(Mandatory=$false)][string]$GUAC_VM_SIZE="Standard_B2ms"
 
 )
 
@@ -30,16 +30,15 @@ $isLoggedIn = [bool](Connect-AzAccount -Credential $azCredential -TenantId $AadT
 if($isLoggedIn){
     Select-AzSubscription -Subscription $AzureSubscriptionName
     Write-Host "Deploying Resource Group."
-    New-AzResourceGroup -Name $ResourceGroupName -Location $GUAC_LOCATION
+    New-AzResourceGroup -Name $ResourceGroupName -Location $GUAC_LOCATION -Tag @{ _contact_person=$EMAIL_TAG }
     Write-Host "Deploying Template."
 
     $invocation = (Get-Variable MyInvocation).Value 
     $currentPath = Split-Path $invocation.MyCommand.Path 
     $rootPath = (get-item $currentPath).parent.FullName
-    $parameterPath = "$($currentPath)\templates\parameters.json"
+    $parameterPath = "$($rootPath)\templates\parametersFile.json"
 
     $parmeters = Get-Content -Path $parameterPath | ConvertFrom-Json
-   
 
     $armParameters = @{
         'GUAC_NAME'=(&{If($GUAC_NAME) {$GUAC_NAME} Else {$parmeters.parameters.GUAC_NAME.value}})
@@ -61,6 +60,7 @@ if($isLoggedIn){
         -ResourceGroupName $ResourceGroupName `
         -TemplateFile $FullDeploymentArmTemplateFile `
         -TemplateParameterObject $armParameters
+
 }
 else {
     Write-Error "Invalid Access."
